@@ -7,7 +7,7 @@ from sklearn.datasets import make_classification
 @dataclass(frozen=True)
 class SyntheticConfig:
     """
-    Konfiguracja generatora danych syntetycznych (sklearn.make_classification).
+    do generowania danych syntetycznych (sklearn.make_classification).
     """
 
     name: str
@@ -32,9 +32,6 @@ class SyntheticConfig:
 def generate_synthetic_dataset(
     cfg: SyntheticConfig,
 ) -> Tuple[np.ndarray, np.ndarray, Dict]:
-    """
-    Generuje (X, y) oraz zwraca metadane konfiguracji do logowania
-    """
     X, y = make_classification(
         n_samples=cfg.n_samples,
         n_features=cfg.n_features,
@@ -55,18 +52,20 @@ def experiment1_feature_configs(
     n_samples: int = 2000,
     feature_counts: Optional[List[int]] = None,
     informative_ratios: Optional[List[float]] = None,
-    redundant_ratio: float = 0.2,
     flip_y: float = 0.01,
     class_sep: float = 1.0,
     random_state_base: int = 1000,
 ) -> List[SyntheticConfig]:
     """
-    Konfiguracja eksperymentu 1 z roznymi liczbami cech i stosunkami cech informatywnych
+    Eksperyment 1: wplyw liczby cech i odsetka cech informatywnych
+    W eksperymencie dodane:
+    - liczba cech 10, 50, 100, 300
+    - odsetek ceech informatywnych: 80%, 40%, 20%, 10%
     """
     if feature_counts is None:
-        feature_counts = [20, 50, 100, 200]
+        feature_counts = [10, 50, 100, 300]
     if informative_ratios is None:
-        informative_ratios = [0.2, 0.4, 0.6, 0.8]
+        informative_ratios = [0.8, 0.4, 0.2, 0.1]
 
     configs: List[SyntheticConfig] = []
     rs = random_state_base
@@ -77,11 +76,9 @@ def experiment1_feature_configs(
             n_informative = int(round(r * n_features))
             n_informative = max(2, min(n_informative, n_features - 2))
 
-            max_redundant = n_features - n_informative
-            n_redundant = int(round(redundant_ratio * n_features))
-            n_redundant = max(0, min(n_redundant, max_redundant))
+            n_redundant = n_features - n_informative
 
-            name = f"syn_E1_f{n_features}_inf{n_informative}_red{n_redundant}"
+            name = f"syn_E1_f{n_features}_inf{int(r*100)}pct"
 
             configs.append(
                 SyntheticConfig(
@@ -108,26 +105,37 @@ def experiment2_imbalance_configs(
     n_samples: int = 3000,
     n_features: int = 100,
     n_informative: int = 20,
-    imbalance_weights: List[Tuple[float, float]] = [(0.5, 0.5), (0.7, 0.3), (0.9, 0.1)],
-    flip_y: float = 0.01,
+    imbalance_weights: List[Tuple[float, float]] = [
+        (0.5, 0.5),
+        (0.7, 0.3),
+        (0.9, 0.1),
+        (0.95, 0.05),
+    ],
+    flip_y: float = 0.05,
     class_sep: float = 1.0,
     random_state_base: int = 2000,
 ) -> List[SyntheticConfig]:
     """
-    Konfiguracja eksperymentu 2 z roznym niezbalansowaniem klas (50/50, 70/30, 90/10)
+    Eksperyment 2: wplyw niezbalansowania klas na skutecznosc redukcji
+    W eksperymencie dodane:
+    - stopien niezbalansowania klas 50/50, 70/30, 90/10, 95/5
+    - liczba cech 100
+    - liczba instancji 3000
+    - odsetek informatywnych cech 20%
     """
     configs: List[SyntheticConfig] = []
     rs = random_state_base
 
     for w0, w1 in imbalance_weights:
-        name = f"syn_E2_w{int(w0*100)}_{int(w1*100)}"
+        imbalance_ratio = int(w0 * 100)
+        name = f"syn_E2_imb{imbalance_ratio}_{int(w1*100)}"
         configs.append(
             SyntheticConfig(
                 name=name,
                 n_samples=n_samples,
                 n_features=n_features,
                 n_informative=n_informative,
-                n_redundant=max(0, n_features - n_informative),
+                n_redundant=n_features - n_informative,
                 n_repeated=0,
                 n_classes=2,
                 weights=(w0, w1),

@@ -1,13 +1,13 @@
 from typing import Dict, Tuple
 import numpy as np
 
-from sklearn.datasets import load_breast_cancer, load_wine, load_iris
+from sklearn.datasets import load_breast_cancer, load_wine, load_iris, load_digits
 
 
 def load_real_dataset(name: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
     """
-    Zwraca X, y oraz metadane datasetu rzeczywistego.
-    name: "breast_cancer", "iris"
+    Return X, y oraz metadane datasetu
+    "breast_cancer", "iris", "wine", "digits"
     """
     name = name.lower().strip()
 
@@ -33,4 +33,26 @@ def load_real_dataset(name: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
         }
         return X, y, meta
 
-    raise ValueError(f"Unknown dataset name: {name}. Use: breast_cancer or iris")
+    if name == "wine":
+        ds = load_wine()
+        X, y = ds.data, ds.target
+        meta = {
+            "dataset": "wine",
+            "n_samples": int(X.shape[0]),
+            "n_features": int(X.shape[1]),
+            "n_classes": int(len(np.unique(y))),
+        }
+        return X, y, meta
+
+    if name == "digits":
+        ds = load_digits()
+        X, y = ds.data, ds.target
+        meta = {
+            "dataset": "digits",
+            "n_samples": int(X.shape[0]),
+            "n_features": int(X.shape[1]),
+            "n_classes": int(len(np.unique(y))),
+        }
+        return X, y, meta
+
+    raise ValueError(f"Unknown dataset name: {name}. breast_cancer, iris, wine, digits")

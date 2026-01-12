@@ -2,7 +2,6 @@ from typing import Dict, Any, Optional
 from sklearn.decomposition import PCA, FastICA
 from sklearn.decomposition import KernelPCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from ccpca import CCPCA
 
 
 def get_reducers(
@@ -10,6 +9,7 @@ def get_reducers(
     random_state: int = 42,
     kpca_kernel: str = "rbf",
     kpca_gamma: Optional[float] = None,
+    n_classes: int = 2,
 ) -> Dict[str, Any]:
 
     reducers = {
@@ -18,6 +18,9 @@ def get_reducers(
             n_components=n_components,
             random_state=random_state,
             max_iter=2000,
+            tol=1e-4,
+            algorithm="parallel",
+            whiten="unit-variance",
         ),
         "kpca": KernelPCA(
             n_components=n_components,
@@ -25,10 +28,8 @@ def get_reducers(
             gamma=kpca_gamma,
             fit_inverse_transform=False,
         ),
-        "lda": LinearDiscriminantAnalysis(n_components=1),
-        "ccpca": CCPCA(
-            n_components=n_components,
-            random_state=random_state,
+        "lda": LinearDiscriminantAnalysis(
+            n_components=min(n_components, n_classes - 1)
         ),
     }
 
