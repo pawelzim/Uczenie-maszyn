@@ -7,7 +7,7 @@ from sklearn.datasets import load_breast_cancer, load_wine, load_iris, load_digi
 def load_real_dataset(name: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
     """
     Return X, y oraz metadane datasetu
-    "breast_cancer", "iris", "wine", "digits"
+    "breast_cancer", "iris", "wine", "digits" z datasetow rzeczywistycj
     """
     name = name.lower().strip()
 

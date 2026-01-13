@@ -49,6 +49,7 @@ def main():
     else:
         raise ValueError("Incorrect SYNTHETIC_EXPERIMENT, should be E1, E2")
 
+    # ladowanie datasetow syn + real
     syn_data = [(cfg.name, *generate_synthetic_dataset(cfg)) for cfg in syn_configs]
     real_data = [(name, *load_real_dataset(name)) for name in real_names]
     datasets = syn_data + real_data
@@ -64,21 +65,21 @@ def main():
     for ds_name, X, y, _ in datasets:
         n_features = X.shape[1]
 
+        # 'adadptacyjny' dobor liczby komponenetow redukcji
         if n_features <= 10:
             n_components_list = [max(2, n_features - 1)]
-
         elif n_features < 300:
             n_components_list = [
                 max(3, int(n_features * 0.30)),
                 max(3, int(n_features * 0.50)),
                 max(3, int(n_features * 0.70)),
             ]
-
         else:
             n_components_list = [20, 50, 100]
 
         n_components_list = sorted({nc for nc in n_components_list if nc < n_features})
 
+        # baseline
         print(f"Processing {ds_name} (baseline)...")
         for clf_name, clf in classifiers.items():
             pipe_none = Pipeline(
@@ -100,6 +101,7 @@ def main():
                 }
             )
 
+        # z redukcja
         for n_components in n_components_list:
             print(f"Processing {ds_name} (n_components={n_components})...")
             gamma = 1.0 / X.shape[1]
