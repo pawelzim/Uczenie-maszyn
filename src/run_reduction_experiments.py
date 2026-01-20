@@ -17,21 +17,35 @@ from metrics import compute_metrics
 from experiment_config import *
 
 
-def evaluate_pipeline_cv(X, y, pipeline, n_splits=4, random_state=42):
-    # foldowanie datasetow do walidacji krzyzowej, potrzebne jak nie ma osobnych zbiorow do uczenia i testowania
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+# walidacja 2 foldowa 5 krotna
+# testy statystyczne
+# opisy metody
+# batch size manipulacja
+# max iter w kpca mozna zredukowac
 
+
+def evaluate_pipeline_cv(X, y, pipeline, random_state=42):
     rows = []
-    for _, (train_idx, test_idx) in enumerate(skf.split(X, y)):
-        # klonowanie pipelineu przed kazda iteracja, bo potencjalnie kopiowalo i wstawialo identyczne wyniki
-        pipe = clone(pipeline)
 
-        pipe.fit(X[train_idx], y[train_idx])
-        pred = pipe.predict(X[test_idx])
-        rows.append(compute_metrics(y[test_idx], pred))
+    for r in range(5):
+        skf = StratifiedKFold(
+            n_splits=2,
+            shuffle=True,
+            random_state=random_state + r,
+        )
 
-    df = pd.DataFrame(rows)
-    return df.mean(numeric_only=True).to_dict(), df.std(numeric_only=True).to_dict()
+        for fold, (train_idx, test_idx) in enumerate(skf.split(X, y)):
+            pipe = clone(pipeline)
+            pipe.fit(X[train_idx], y[train_idx])
+            pred = pipe.predict(X[test_idx])
+
+            m = compute_metrics(y[test_idx], pred)
+            rows.append({"repeat": r, "fold": fold, **m})
+
+    raw_df = pd.DataFrame(rows)
+    mean = raw_df.drop(columns=["repeat", "fold"]).mean(numeric_only=True).to_dict()
+    std = raw_df.drop(columns=["repeat", "fold"]).std(numeric_only=True).to_dict()
+    return mean, std, raw_df
 
 
 def main():
@@ -45,7 +59,7 @@ def main():
     elif SYNTHETIC_EXPERIMENT == "E2":
         syn_configs = experiment2_imbalance_configs()
         exp_tag = "_E2"
-        real_names = []
+        real_names = ["breast_cancer", "wine", "digits"]
     else:
         raise ValueError("Incorrect SYNTHETIC_EXPERIMENT, should be E1, E2")
 
@@ -62,13 +76,15 @@ def main():
     )
 
     rows = []
+    raw_rows = []
+
     for ds_name, X, y, _ in datasets:
         n_features = X.shape[1]
 
         # 'adadptacyjny' dobor liczby komponenetow redukcji
         if n_features <= 10:
             n_components_list = [max(2, n_features - 1)]
-        elif n_features < 300:
+        elif n_features < 200:
             n_components_list = [
                 max(3, int(n_features * 0.30)),
                 max(3, int(n_features * 0.50)),
@@ -88,7 +104,7 @@ def main():
                     ("clf", clone(clf)),
                 ]
             )
-            mean, std = evaluate_pipeline_cv(X, y, pipe_none)
+            mean, std, raw_df = evaluate_pipeline_cv(X, y, pipe_none)
 
             rows.append(
                 {
@@ -100,6 +116,12 @@ def main():
                     **{f"{k}_std": v for k, v in std.items()},
                 }
             )
+            raw_df = raw_df.copy()
+            raw_df["dataset"] = ds_name
+            raw_df["classifier"] = clf_name
+            raw_df["reducer"] = "none"
+            raw_df["n_components"] = np.nan
+            raw_rows.append(raw_df)
 
         # z redukcja
         for n_components in n_components_list:
@@ -124,7 +146,7 @@ def main():
                             ("clf", clone(clf)),
                         ]
                     )
-                    mean, std = evaluate_pipeline_cv(X, y, pipe)
+                    mean, std, raw_df = evaluate_pipeline_cv(X, y, pipe)
 
                     rows.append(
                         {
@@ -136,12 +158,25 @@ def main():
                             **{f"{k}_std": v for k, v in std.items()},
                         }
                     )
+                    raw_df = raw_df.copy()
+                    raw_df["dataset"] = ds_name
+                    raw_df["classifier"] = clf_name
+                    raw_df["reducer"] = red_name
+                    raw_df["n_components"] = n_components
+                    raw_rows.append(raw_df)
 
     out = pd.DataFrame(rows).sort_values(
         ["dataset", "n_components", "reducer", "classifier"]
     )
     reducers_suffix = build_suffix(ENABLED_REDUCERS)
     out.to_csv(out_dir / f"reduction_cv{exp_tag}{reducers_suffix}.csv", index=False)
+    raw_out = pd.concat(raw_rows, ignore_index=True)
+    raw_out = raw_out.sort_values(
+        ["dataset", "classifier", "reducer", "n_components", "repeat", "fold"]
+    )
+    raw_out.to_csv(
+        out_dir / f"reduction_cv_raw{exp_tag}{reducers_suffix}.csv", index=False
+    )
 
 
 if __name__ == "__main__":
